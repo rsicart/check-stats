@@ -128,62 +128,6 @@ def checkDates(dateFrom, dateTo):
 	return True
 
 
-def countCsvLogsServer(dateFrom, dateTo, campaign, banner, website, event, server = HOSTS['cron']):
-	''' Checks displays for a specific campaing, banner, website and date
-		dateFrom and dateTo must share same year and month, and a max difference of days of 4
-		DEPRECATED
-	'''
-	if not checkDates(dateFrom, dateTo):
-		usage()
-		exit(2)
-
-	displayFilter = getEventFilter(event)
-	total = 0
-
-	# Set right adsp log folder
-	targetFolder = CRON_CSV_FOLDER
-	if server != HOSTS['cron']:
-		targetFolder = FRONT_CSV_FOLDER
-
-	# range + 1 to get today's data
-	for day in range(dateFrom.day, dateTo.day + 1):
-		logfolder = '{}/{}/{}/{}'.format(targetFolder, dateFrom.year, dateFrom.month, day)
-		command = 'ssh {} find {} -name \"{}_{}_{}\" -print0 | xargs -0 cat | grep \"{}\" | wc -l'.format(server, logfolder, campaign, banner, website, displayFilter)
-		sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-		output = sshproc.communicate()[0]
-		total += int(output)
-
-	return total
-
-
-def countCsvLogsWrapper(dateFrom, dateTo, campaign, banner, website, event, server = None):
-	''' Checks displays for a specific campaing, banner, website and date
-		dateFrom and dateTo must share same year and month, and a max difference of days of 4
-		DEPRECATED
-	'''
-	if not checkDates(dateFrom, dateTo):
-		usage()
-		exit(2)
-
-	displayFilter = getEventFilter(event)
-	total = 0
-
-	if server == 'all':
-		''' Check front server
-		'''
-		for host in getHosts('frontals'):
-			try:
-				total += countCsvLogsServer(dateFrom, dateTo, campaign, banner, website, event, host)
-			except TypeError:
-				pass
-	else:
-		''' Check cron server
-		'''
-		total = countCsvLogsServer(dateFrom, dateTo, campaign, banner, website, event)
-
-	print total
-
-
 def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HOSTS['cron']):
 	''' Checks displays for a specific campaing, banner, website and date
 		dateFrom and dateTo must share same year and month, and a max difference of days of 4
@@ -319,7 +263,7 @@ def main(argv):
 			actions['track'] = arg
 		elif opt in ('-x', '--exclude'):
 			actions['exclude'] = getExclude(arg)
-	
+
 	if actions['campaign'] is None or actions['banner'] is None or actions['website'] is None:
 		usage()
 		exit(5)
