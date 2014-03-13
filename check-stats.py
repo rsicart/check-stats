@@ -49,6 +49,7 @@ def usage():
 	print " -x | --exclude=http,csv,db,track to avoid executing specifyc tasks."
 	print " -d | --daemon=(*apache|nginx) service to check for http logs."
 	print " -r | --track= !!! NOT IMPLEMENTED !!!"
+	print " -v | --verbose shows some detailed info."
 	print "\n"
 
 
@@ -79,7 +80,7 @@ def getHttpPattern(script, campaign, banner, website):
 	else:
 		return httpScript['tag']
 
-def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 'apache'):
+def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 'apache', verbose = False):
 	''' Checks displays for a specific campaing, banner, website and date
 	'''
 	if not checkDates(dateFrom, dateTo):
@@ -105,11 +106,13 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 			dateFromBack = dateFromBack.replace(day = day + 1)
 
 	total = 0
+	hits = {}
 	pattern = getHttpPattern(script, campaign, banner, website)
 	for server in getHosts('frontals'):
 		command = 'ssh {} zgrep --no-filename -c -e \'{}\' {}'.format(server, pattern, ' '.join(grepLogs))
 		sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
 		output = sshproc.communicate()[0]
+		hits[server] = 0
 		if output is not None:
 			try:
 				''' output is iterable (multiple files)
@@ -117,8 +120,14 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 				output_iter = iter(output)
 				for sum in output.rstrip().split('\n'):
 					total += int(sum)
+					hits[server] += int(sum)
 			except TypeError:
 				total += int(output)
+				hits[server] += int(output)
+
+		if verbose:
+			# total per server
+			print '{}:\t{}'.format(server, hits[server])
 
 	print total
 
@@ -143,7 +152,7 @@ def checkDates(dateFrom, dateTo):
 	return True
 
 
-def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HOSTS['cron']):
+def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HOSTS['cron'], verbose = False):
 	''' Checks displays for a specific campaing, banner, website and date
 		dateFrom and dateTo must share same year and month, and a max difference of days of 4
 
@@ -165,7 +174,9 @@ def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HO
 
 	''' Check front server
 	'''
+	hits = {}
 	for host in getHosts(target):
+		hits[host] = 0
 		try:
 			# range + 1 to get today's data
 			for day in range(dateFrom.day, dateTo.day + 1):
@@ -174,8 +185,12 @@ def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HO
 				sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
 				output = sshproc.communicate()[0]
 				total += int(output)
+				hits[host] += int(output)
 		except TypeError:
 			pass
+
+		if verbose:
+			print '{}:\t{}'.format(host, hits[host])
 
 	print total
 
@@ -229,7 +244,7 @@ def checkTracking(version):
 
 def main(argv):
 	try:
-		opts, args = getopt.getopt(argv, "hf:t:c:b:w:e:s:l:x:d:r:", ["help", "from=", "to=", "campaign=", "banner=", "website=", "event=", "script=", "lookforcsvlogs=", "exclude=", "daemon=", "track="])
+		opts, args = getopt.getopt(argv, "hf:t:c:b:w:e:s:l:x:d:r:v", ["help", "from=", "to=", "campaign=", "banner=", "website=", "event=", "script=", "lookforcsvlogs=", "exclude=", "daemon=", "track=", "verbose"])
 	except getopt.GetoptError:
 		usage()
 		sys.exit(2)
@@ -246,6 +261,7 @@ def main(argv):
 		'exclude': [],
 		'daemon': None,
 		'track': None,
+		'verbose': False,
 	}
 
 	''' Parse script arguments
@@ -278,6 +294,8 @@ def main(argv):
 			actions['track'] = arg
 		elif opt in ('-x', '--exclude'):
 			actions['exclude'] = getExclude(arg)
+		elif opt in ('-v', '--verbose'):
+			actions['verbose'] = True
 
 	if actions['campaign'] is None or actions['banner'] is None or actions['website'] is None:
 		usage()
@@ -294,11 +312,11 @@ def main(argv):
 
 	if 'csv' not in actions['exclude']:
 		print "Adsp logs:"
-		countCsvLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['event'], actions['lookforcsvlogs'])
+		countCsvLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['event'], actions['lookforcsvlogs'], actions['verbose'])
 
 	if 'http' not in actions['exclude']:
 		print "Http logs:"
-		countHttpLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['script'], actions['daemon'])
+		countHttpLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['script'], actions['daemon'], actions['verbose'])
 
 	if 'track' not in actions['exclude']:
 		print "Tracking:"
