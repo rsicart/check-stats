@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-'''	TODO
+'''
+Script to check stats for last 4 days.
+We can check different targets for the tests."
+For example, for csv logs we can check frontal cluster files or cron server only.
+Another example, for http logs we can choose to parse apache or nginx log files.
+
+Author: R.Sicart
 '''
 import sys, getopt
 import subprocess
@@ -155,8 +161,6 @@ def checkDates(dateFrom, dateTo):
 def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HOSTS['cron'], verbose = False):
 	''' Checks displays for a specific campaing, banner, website and date
 		dateFrom and dateTo must share same year and month, and a max difference of days of 4
-
-		TODO: delete other countCsvLogs after finishing this function
 	'''
 	if not checkDates(dateFrom, dateTo):
 		usage()
