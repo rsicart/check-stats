@@ -32,9 +32,24 @@ except:
 	FRONT_CSV_FOLDER = ''
 
 def usage():
-	print "Usage: check-stats.py -h"
-	print "Check stats for last {} days.".format(4)
-	print "Long options: --help --from=YYYY-MM-DD --to=YYYY-MM-DD --campaign=INT --banner=INT --website=INT --event=(*display|click|click_certified) --script=(*tag|banner|advertise) --lookforcsvlogs=all --exclude=http,adsp,db --daemon=(*apache|nginx)"
+	print "\nUsage: check-stats.py [options]"
+	print "\nScript to check stats for last {} days. We can check different targets for the tests.".format(4)
+	print "For example, for csv logs we can check frontal cluster files or cron server only."
+	print "Another example, for http logs we can choose to parse apache or nginx log files."
+	print "\nOptions:"
+	print " -h | --help shows usage"
+	print " -f | --from=YYYY-MM-DD to specify beginning date."
+	print " -r | --to=YYYY-MM-DD to specify ending date."
+	print " -c | --campaign=INT to set campaign id."
+	print " -b | --banner=INT to set banner id."
+	print " -w | --website=INT to set website id."
+	print " -e | --event=(*display|click|click_certified) to specify an event type."
+	print " -s | --script=(*tag|banner|advertise) to specify script name to parse http logs."
+	print " -l | --lookforcsvlogs=all to select csv log target: cron server (default) or frontal cluster (all)."
+	print " -x | --exclude=http,csv,db,track to avoid executing specifyc tasks."
+	print " -d | --daemon=(*apache|nginx) service to check for http logs."
+	print " -r | --track= !!! NOT IMPLEMENTED !!!"
+	print "\n"
 
 
 def getDbConfig():
