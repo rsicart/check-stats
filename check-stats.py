@@ -99,6 +99,7 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 
 	logfile = 'access_log'
 	grepLogs = []
+	# TODO: check if adding access_log by default is right !!! (f.e. when checking yesterdays stats)
 	grepLogs.append(logfolder + '/' + logfile)
 
 	if dateFrom < date.today():
@@ -314,13 +315,13 @@ def main(argv):
 		print "Db stats:"
 		getDbDisplays(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'])
 
-	if 'csv' not in actions['exclude']:
-		print "Adsp logs:"
-		countCsvLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['event'], actions['lookforcsvlogs'], actions['verbose'])
-
 	if 'http' not in actions['exclude']:
 		print "Http logs:"
 		countHttpLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['script'], actions['daemon'], actions['verbose'])
+
+	if 'csv' not in actions['exclude']:
+		print "Csv logs:"
+		countCsvLogs(actions['from'], actions['to'], actions['campaign'], actions['banner'], actions['website'], actions['event'], actions['lookforcsvlogs'], actions['verbose'])
 
 	if 'track' not in actions['exclude']:
 		print "Tracking:"
