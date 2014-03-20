@@ -100,7 +100,8 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 	logfile = 'access_log'
 	grepLogs = []
 	# TODO: check if adding access_log by default is right !!! (f.e. when checking yesterdays stats)
-	grepLogs.append(logfolder + '/' + logfile)
+	if dateFrom == date.today() or dateTo == date.today():
+		grepLogs.append(logfolder + '/' + logfile)
 
 	if dateFrom < date.today():
 		# logs for today are stored in tomorrows filename.gz
@@ -111,6 +112,11 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 			logfile = 'access_log-{}.gz'.format(dateFromBack.strftime("%Y%m%d"))
 			grepLogs.append(logfolder + '/' + logfile)
 			dateFromBack = dateFromBack.replace(day = day + 1)
+
+	if len(grepLogs) == 0:
+		print 'Error: date range is wrong.'
+		usage()
+		exit(6)
 
 	total = 0
 	hits = {}
