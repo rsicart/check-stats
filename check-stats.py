@@ -106,6 +106,7 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 	if dateFrom < date.today():
 		# logs for today are stored in tomorrows filename.gz
 		dateFrom = dateFrom.replace(day = dateFrom.day + 1)
+		dateTo = dateTo.replace(day = dateTo.day + 1)
 
 		dateFromBack = dateFrom
 		for day in range(dateFrom.day, dateTo.day + 1):
