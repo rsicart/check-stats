@@ -194,22 +194,36 @@ def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HO
 	''' Check front server
 	'''
 	hits = {}
+	procs = {}
 	for host in getHosts(target):
 		hits[host] = 0
+		procs[host] = {}
 		try:
 			# range + 1 to get today's data
 			for day in range(dateFrom.day, dateTo.day + 1):
+				procs[host] = {day:0}
 				logfolder = '{}/{}/{}/{}'.format(targetFolder, dateFrom.year, dateFrom.month, day)
 				command = 'ssh {} find {} -name \"{}_{}_{}\" -print0 | xargs -0 cat | grep \"{}\" | wc -l'.format(host, logfolder, campaign, banner, website, displayFilter)
-				sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-				output = sshproc.communicate()[0]
-				total += int(output)
-				hits[host] += int(output)
+				procs[host] = {
+					day: subprocess.Popen(command.split(), stdout = subprocess.PIPE)
+				}
 		except TypeError:
 			pass
 
-		if verbose:
-			print '{}:\t{}'.format(host, hits[host])
+	while procs:
+		for host, date in procs.items():
+			for day, proc in date.items():
+				if proc.poll() is not None:
+					output = proc.stdout.read()
+					total += int(output)
+					hits[host] += int(output)
+					del(date[day])
+			if len(date) == 0:
+				del(procs[host])
+
+	if verbose:
+		for host, subtotal in hits.items():
+			print '{}:\t{}'.format(host, subtotal)
 
 	print total
 
