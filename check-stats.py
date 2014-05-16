@@ -121,25 +121,32 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 
 	total = 0
 	hits = {}
+	procs = {}
 	pattern = getHttpPattern(script, campaign, banner, website)
 	for server in getHosts('frontals'):
 		command = 'ssh {} zgrep --no-filename -c -e \'{}\' {}'.format(server, pattern, ' '.join(grepLogs))
-		sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-		output = sshproc.communicate()[0]
+		procs[server] = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
 		hits[server] = 0
-		if output is not None:
-			try:
-				''' output is iterable (multiple files)
-				'''
-				output_iter = iter(output)
-				for sum in output.rstrip().split('\n'):
-					total += int(sum)
-					hits[server] += int(sum)
-			except TypeError:
-				total += int(output)
-				hits[server] += int(output)
 
-		if verbose:
+	while procs:
+		for server, proc in procs.items():
+			if proc.poll() is not None:
+				output = proc.stdout.read()
+				try:
+					''' output is iterable (multiple files)
+					'''
+					output_iter = iter(output)
+					for sum in output.rstrip().split('\n'):
+						total += int(sum)
+						hits[server] += int(sum)
+				except TypeError:
+					total += int(output)
+					hits[server] += int(output)
+				''' remove proc from queue '''
+				del(procs[server])
+
+	if verbose:
+		for server, subtotal in hits.items():
 			# total per server
 			print '{}:\t{}'.format(server, hits[server])
 
@@ -187,22 +194,36 @@ def countCsvLogs(dateFrom, dateTo, campaign, banner, website, event, server = HO
 	''' Check front server
 	'''
 	hits = {}
+	procs = {}
 	for host in getHosts(target):
 		hits[host] = 0
+		procs[host] = {}
 		try:
 			# range + 1 to get today's data
 			for day in range(dateFrom.day, dateTo.day + 1):
+				procs[host] = {day:0}
 				logfolder = '{}/{}/{}/{}'.format(targetFolder, dateFrom.year, dateFrom.month, day)
 				command = 'ssh {} find {} -name \"{}_{}_{}\" -print0 | xargs -0 cat | grep \"{}\" | wc -l'.format(host, logfolder, campaign, banner, website, displayFilter)
-				sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-				output = sshproc.communicate()[0]
-				total += int(output)
-				hits[host] += int(output)
+				procs[host] = {
+					day: subprocess.Popen(command.split(), stdout = subprocess.PIPE)
+				}
 		except TypeError:
 			pass
 
-		if verbose:
-			print '{}:\t{}'.format(host, hits[host])
+	while procs:
+		for host, date in procs.items():
+			for day, proc in date.items():
+				if proc.poll() is not None:
+					output = proc.stdout.read()
+					total += int(output)
+					hits[host] += int(output)
+					del(date[day])
+			if len(date) == 0:
+				del(procs[host])
+
+	if verbose:
+		for host, subtotal in hits.items():
+			print '{}:\t{}'.format(host, subtotal)
 
 	print total
 
