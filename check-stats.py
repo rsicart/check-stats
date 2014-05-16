@@ -121,25 +121,32 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 
 	total = 0
 	hits = {}
+	procs = {}
 	pattern = getHttpPattern(script, campaign, banner, website)
 	for server in getHosts('frontals'):
 		command = 'ssh {} zgrep --no-filename -c -e \'{}\' {}'.format(server, pattern, ' '.join(grepLogs))
-		sshproc = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-		output = sshproc.communicate()[0]
+		procs[server] = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
 		hits[server] = 0
-		if output is not None:
-			try:
-				''' output is iterable (multiple files)
-				'''
-				output_iter = iter(output)
-				for sum in output.rstrip().split('\n'):
-					total += int(sum)
-					hits[server] += int(sum)
-			except TypeError:
-				total += int(output)
-				hits[server] += int(output)
 
-		if verbose:
+	while procs:
+		for server, proc in procs.items():
+			if proc.poll() is not None:
+				output = proc.stdout.read()
+				try:
+					''' output is iterable (multiple files)
+					'''
+					output_iter = iter(output)
+					for sum in output.rstrip().split('\n'):
+						total += int(sum)
+						hits[server] += int(sum)
+				except TypeError:
+					total += int(output)
+					hits[server] += int(output)
+				''' remove proc from queue '''
+				del(procs[server])
+
+	if verbose:
+		for server, subtotal in hits.items():
 			# total per server
 			print '{}:\t{}'.format(server, hits[server])
 
