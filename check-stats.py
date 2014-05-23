@@ -99,30 +99,23 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 		logfolder = '/var/log/nginx'
 
 	logfile = 'access_log'
-	grepDays = {}
+	grepDays = []
 
 	if dateFrom == date.today() or dateTo == date.today():
-		grepDays['{}'.format(dateFrom.strftime("%d/%b/%Y"))] = [logfolder + '/' + logfile]
+		grepDays.append(logfolder + '/' + logfile)
 
 	if dateFrom < date.today():
 
 		dateFromBack = dateFrom
-		for day in range(dateFrom.day, dateTo.day + 1):
+		for day in range(dateFrom.day, dateTo.day + 2):
 			# set today's logfile
 			if dateFromBack > date.today():
 				logfile = 'access_log'
 			else:
 				logfile = 'access_log-{}.gz'.format(dateFromBack.strftime("%Y%m%d"))
 
-			# set tomorrow's logile, used for log rotation grep and count until 3am
-			dateNextDay = dateFromBack.replace(day = day + 1)
-			if dateNextDay > date.today():
-				logNextDay = 'access_log'
-			else:
-				logNextDay = 'access_log-{}.gz'.format(dateNextDay.strftime("%Y%m%d"))
-
 			# delete duplicates and save
-			grepDays['{}'.format(dateFromBack.strftime("%d/%b/%Y"))] = list(set([logfolder + '/' + logfile, logfolder + '/' + logNextDay]))
+			grepDays.append(logfolder + '/' + logfile)
 
 			# update day
 			dateFromBack = dateFromBack.replace(day = day + 1)
@@ -132,27 +125,33 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 		usage()
 		exit(6)
 
+	dayBefore = dateFrom.replace(day = dateFrom.day - 1)
+	dayAfter = dateTo.replace(day = dateTo.day + 1)
 	total = 0
 	hits = {}
 	procs = {}
 	pattern = getHttpPattern(script, campaign, banner, website)
 	for server in getHosts('frontals'):
-		for day,logs in grepDays.items():
-			command = 'ssh {} zgrep --no-filename -e \'{}\' {} | grep -c \'{}\''.format(server, pattern, ' '.join(logs), day)
-			procs[server] = {day:subprocess.Popen(command.split(), stdout = subprocess.PIPE)}
-			hits[server] = 0
+		command = 'ssh {} zgrep --no-filename -e \'{}\' {} | grep -v \'{}\' | grep -c -v \'{}\''.format(server, pattern, ' '.join(grepDays), dayBefore.strftime("%d/%b/%Y"), dayAfter.strftime("%d/%b/%Y"))
+		procs[server] = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
+		hits[server] = 0
 
 	while procs:
-		for server, days in procs.items():
-			for day,proc in days.items():
-				if proc.poll() is not None:
-					output = proc.stdout.read()
+		for server, proc in procs.items():
+			if proc.poll() is not None:
+				output = proc.stdout.read()
+				try:
+					''' output is iterable (multiple files)
+					'''
+					output_iter = iter(output)
+					for sum in output.rstrip().split('\n'):
+						total += int(output)
+						hits[server] += int(output)
+				except TypeError:
 					total += int(output)
 					hits[server] += int(output)
-					del(days[day])
-
-				if len(days) == 0:
-					del(procs[server])
+				# remove proc from queue
+				del(procs[server])
 
 	if verbose:
 		for server, subtotal in hits.items():
