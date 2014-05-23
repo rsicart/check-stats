@@ -12,6 +12,7 @@ import sys, getopt
 import subprocess
 from datetime import date
 import MySQLdb
+import os.path
 
 # Init settings
 try:
@@ -98,23 +99,35 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 		logfolder = '/var/log/nginx'
 
 	logfile = 'access_log'
-	grepLogs = []
-	# TODO: check if adding access_log by default is right !!! (f.e. when checking yesterdays stats)
+	grepDays = {}
+
 	if dateFrom == date.today() or dateTo == date.today():
-		grepLogs.append(logfolder + '/' + logfile)
+		grepDays['{}'.format(dateFrom.strftime("%d/%b/%Y"))] = [logfolder + '/' + logfile]
 
 	if dateFrom < date.today():
-		# logs for today are stored in tomorrows filename.gz
-		dateFrom = dateFrom.replace(day = dateFrom.day + 1)
-		dateTo = dateTo.replace(day = dateTo.day + 1)
 
 		dateFromBack = dateFrom
 		for day in range(dateFrom.day, dateTo.day + 1):
-			logfile = 'access_log-{}.gz'.format(dateFromBack.strftime("%Y%m%d"))
-			grepLogs.append(logfolder + '/' + logfile)
+			# set today's logfile
+			if dateFromBack > date.today():
+				logfile = 'access_log'
+			else:
+				logfile = 'access_log-{}.gz'.format(dateFromBack.strftime("%Y%m%d"))
+
+			# set tomorrow's logile, used for log rotation grep and count until 3am
+			dateNextDay = dateFromBack.replace(day = day + 1)
+			if dateNextDay > date.today():
+				logNextDay = 'access_log'
+			else:
+				logNextDay = 'access_log-{}.gz'.format(dateNextDay.strftime("%Y%m%d"))
+
+			# delete duplicates and save
+			grepDays['{}'.format(dateFromBack.strftime("%d/%b/%Y"))] = list(set([logfolder + '/' + logfile, logfolder + '/' + logNextDay]))
+
+			# update day
 			dateFromBack = dateFromBack.replace(day = day + 1)
 
-	if len(grepLogs) == 0:
+	if len(grepDays) == 0:
 		print 'Error: date range is wrong.'
 		usage()
 		exit(6)
@@ -124,26 +137,22 @@ def countHttpLogs(dateFrom, dateTo, campaign, banner, website, script, daemon = 
 	procs = {}
 	pattern = getHttpPattern(script, campaign, banner, website)
 	for server in getHosts('frontals'):
-		command = 'ssh {} zgrep --no-filename -c -e \'{}\' {}'.format(server, pattern, ' '.join(grepLogs))
-		procs[server] = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
-		hits[server] = 0
+		for day,logs in grepDays.items():
+			command = 'ssh {} zgrep --no-filename -e \'{}\' {} | grep -c \'{}\''.format(server, pattern, ' '.join(logs), day)
+			procs[server] = {day:subprocess.Popen(command.split(), stdout = subprocess.PIPE)}
+			hits[server] = 0
 
 	while procs:
-		for server, proc in procs.items():
-			if proc.poll() is not None:
-				output = proc.stdout.read()
-				try:
-					''' output is iterable (multiple files)
-					'''
-					output_iter = iter(output)
-					for sum in output.rstrip().split('\n'):
-						total += int(sum)
-						hits[server] += int(sum)
-				except TypeError:
+		for server, days in procs.items():
+			for day,proc in days.items():
+				if proc.poll() is not None:
+					output = proc.stdout.read()
 					total += int(output)
 					hits[server] += int(output)
-				''' remove proc from queue '''
-				del(procs[server])
+					del(days[day])
+
+				if len(days) == 0:
+					del(procs[server])
 
 	if verbose:
 		for server, subtotal in hits.items():
