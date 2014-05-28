@@ -10,7 +10,7 @@ Author: R.Sicart
 '''
 import sys, getopt
 import subprocess
-from datetime import date
+from datetime import date, datetime
 import MySQLdb
 import os.path
 
@@ -343,6 +343,7 @@ def main(argv):
 		exit(5)
 
 	print '--------------------------------------------------------------------------------'
+	print '{}'.format(datetime.now())
 	print 'From: {} ::: To: {}'.format(actions['from'], actions['to'])
 	print 'Campaign: {} ::: Website: {} ::: Banner: {}'.format(actions['campaign'], actions['website'], actions['banner'])
 	print '--------------------------------------------------------------------------------'
